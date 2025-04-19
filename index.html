@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ドラクエ風ゲームver1</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+  <style>
+    body {font-family: 'Courier New', monospace;
+          background: #222; 
+          color: #fff; 
+          padding: 20px;
+          line-height: 1.6;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh; /* 画面の高さいっぱいにする */
+          margin: 0;
+    }
+    #app {
+      max-width: 500px;
+      margin: 0 auto;
+      background: #222;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px #000;
+    }
+    p {
+      margin: 0.2em 0;
+    }
+    .log {
+      background: #111;
+      border: 1px solid #555;
+      padding: 10px;
+      margin-top: 20px;
+      height:  150px;
+      width: 400px;
+      overflow-y: auto;
+      font-size: 14px;
+      white-space: pre-line;
+      display: flex;
+      flex-direction: column;
+      align-items: left;
+    }
+    .command {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+
+    }
+    .command button {
+      background-color: #444;
+      color: #fff;
+      border: 2px solid #fff;
+      padding: 8px 16px;
+      margin-right: 10px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    .command button:hover {
+      background: #666;
+    }
+    .hp-bar, .mp-bar {
+      width: 200px;
+      height: 10px;
+      background: #444;
+      border: 2px solid #fff;
+      /*margin-top: 5px;*/
+      border-radius: 5px;
+      margin: 5px auto;
+    }
+    .hp-inner {
+      height: 100%;
+      background: limegreen;
+      transition: width 0.3s ease-in-out;
+    }
+    .hp-inner-enemy {
+      height: 100%;
+      background: crimson;
+      transition: width 0.3s ease;
+    }
+    .mp-inner {
+      height: 100%;
+      background: dodgerblue;
+      transition: width 0.5s ease-in-out;
+    }
+    .enemy {
+      margin-top: 15px;
+    }
+    .enemy-img {
+      width: 100px;
+      height: auto;
+      image-rendering: pixelated;
+      margin-top: 5px;
+    }
+    .status-area {
+      text-align: center;
+    }
+    .enemy-block {
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="status-area">
+      <p>[勇者] HP: {{ player.hp }}</p>
+      <div class="hp-bar">
+        <div class="hp-inner" :style="{width: (player.hp / player.maxHp * 100) + '%'}"></div>
+      </div>
+      <p>[勇者]  MP: {{ player.mp }} / {{ player.maxMp }}</p>
+      <div class="mp-bar">
+        <div class="mp-inner" :style="{width: (player.mp / player.maxMp * 100) + '%'}"></div>
+      </div>
+      <p>[勇者] Lv: {{ player.level }} / EXP: {{ player.exp }} / 次のLvまで: {{ player.nextExp }} EXP</p>
+      <div v-for="(enemy, index) in enemies" :key="index" class="enemy-block">
+        <img :src="enemy.img" alt="enemy" class="enemy-img">
+        <p>[{{ enemy.name}}] HP: {{ enemy.hp }}</p>
+        <div class="hp-bar">
+          <div class="hp-inner-enemy" :style="{width: (enemy.hp / getEnemyMaxHp(enemy.name) * 100) + '%'}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="command" v-if="!isBattleOver">
+      <p>どうする？</p>
+      <button @click="attack">たたかう</button>
+      <button @click="magicAttack">まほう</button>
+      <button @click="run">にげる</button>
+    </div>
+
+    <div class="log" ref="logBox">
+      <p v-for="(log, index) in logs" :key="index">＞ {{ log }}</p>
+    </div>
+
+    <div v-if="isBattleOver">
+      <p>{{ resultMessage }}</p>
+    </div>
+  </div>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data: {
+        player: { 
+          hp: 50,
+          maxHp:50,
+          mp:10,
+          maxMp:10,
+          level: 1,
+          exp: 0,
+          nextExp:20
+        },
+        enemies: [],
+        enemySets: [
+          [{ name: "スライム", hp:10, img: "./img/img1.png", exp:5}],
+          [{ name: "ドラキー", hp:12, img: "./img/img3.png", exp:7}],
+          [{ name: "スライムベス", hp:15, img: "./img/img2.png", exp:8}],
+          [{ name: "スライム", hp:10, img: "./img/img1.png", exp:5},{ name: "ドラキー", hp:12, img: "./img/img3.png", exp:7}],
+          [{ name: "スライム", hp:10, img: "./img/img1.png", exp:5},{ name: "スライムベス", hp:15, img: "./img/img2.png", exp:8}],
+          [{ name: "ドラキー", hp:12, img: "./img/img3.png", exp:7},{ name: "スライムベス", hp:15, img: "./img/img2.png", exp:8}],
+          [{ name: "スライム", hp:10, img: "./img/img1.png", exp:5},{ name: "ドラキー", hp:12, img: "./img/img3.png", exp:7},{ name: "スライムベス", hp:15, img: "./img/img2.png", exp:8}],
+        ],  
+        logs: [],
+        isBattleOver: false,
+        resultMessage: ''
+      },
+      created() {
+        this.enemies = this.getRandomEnemySet();
+        this.fanfare = new Audio('./se/levelUp.mp3');
+      },
+      methods: {
+        getEnemyMaxHp(name) {
+          const base = {
+            'スライム': 10,
+            'ドラキー': 12,
+            'スライムベス': 15
+          };
+          return base[name] || 10;
+        },
+        getRandomEnemySet() {
+          const set = this.enemySets[Math.floor(Math.random() * this.enemySets.length)];
+          return JSON.parse(JSON.stringify(set));
+        },
+        attack() {
+          const playerDmg = Math.floor(Math.random() * 5) + 3;
+          const targetIndex = this.getAliveEnemyIndex();
+          if (targetIndex === -1) return;
+
+          this.enemies[targetIndex].hp -= playerDmg;
+          this.logs.push(`勇者は ${this.enemies[targetIndex].name} に ${playerDmg} のダメージ！`);
+          this.scrollToBottom();
+
+          if(this.enemies[targetIndex].hp <= 0) {
+            this.enemies[targetIndex].hp = 0;
+            this.player.exp += this.enemies[targetIndex].exp;
+            this.logs.push(`${this.enemies[targetIndex].name} をたおした！ 経験値 ${this.enemies[targetIndex].exp} を獲得！`);
+          }
+
+          if(this.areAllDefeated()) {
+            this.endBattle(`すべての敵をたおした！`);
+            this.checkLevelUp();
+            return;
+          }
+
+          this.enemies.forEach((enemy) => {
+            if(enemy.hp > 0) {
+              const enemyDmg = Math.floor(Math.random() * 4) + 2;
+              this.player.hp -= enemyDmg;
+              this.logs.push(`${enemy.name} のこうげき！ ${enemyDmg} のダメージ！`)
+            }
+            this.scrollToBottom();
+          });
+
+          if (this.player.hp <= 0) {
+            this.player.hp = 0;
+            this.endBattle(`敗北．．．勇者は倒れてしまった！`);
+          };
+        },
+        magicAttack() {
+          const mpCost = 3;
+
+          if(this.player.mp < mpCost) {
+            this.logs.push("MPが足りない！");
+            this.scrollToBottom();
+            return;
+          }
+
+          this.player.mp -= mpCost;
+
+          const magicDmg = Math.floor(Math.random() * 6) + 5;
+          const targetIndex = this.getAliveEnemyIndex();
+          if(targetIndex === -1) return;
+
+          this.enemies[targetIndex].hp -= magicDmg;
+          this.logs.push(`勇者は まほうこうげき！ ${this.enemies[targetIndex].name} に ${magicDmg} のダメージ！ `)
+          this.scrollToBottom();
+
+          if(this.enemies[targetIndex].hp <= 0) {
+            this.enemies[targetIndex].hp = 0;
+            this.player.exp += this.enemies[targetIndex].exp;
+            this.logs.push(`${this.enemies[targetIndex].name} をたおした！ 経験値 ${this.enemies[targetIndex].exp} を獲得！`);
+          }
+
+          if(this.areAllDefeated()) {
+            this.endBattle(`すべての敵をたおした！`);
+            this.checkLevelUp();            
+            return;
+          }
+
+          this.enemies.forEach((enemy) => {
+            if(enemy.hp > 0) {
+              const enemyDmg = Math.floor(Math.random() * 4) + 2;
+              this.player.hp -= enemyDmg;
+              this.logs.push(`${enemy.name} のこうげき！ ${enemyDmg} のダメージ！`)
+              this.scrollToBottom();
+            }
+          });
+
+          if (this.player.hp <= 0) {
+            this.player.hp = 0;
+            this.endBattle(`敗北．．．勇者は倒れてしまった！`);
+          };
+
+
+        },
+        getAliveEnemyIndex() {
+          const alive = this.enemies
+          .map((enemy, index) =>(enemy.hp > 0 ? index : -1) )
+          .filter(index => index !== -1 );
+          if (alive.length === 0) return;
+          return alive[Math.floor(Math.random() * alive.length)];
+        },
+        areAllDefeated() {
+          return this.enemies.every(enemy => enemy.hp <= 0);
+        },
+        checkLevelUp() {
+          while(this.player.exp >= this.player.nextExp) {
+            this.player.exp -= this.player.nextExp;
+            this.player.level += 1;
+            this.player.maxHp += Math.floor(Math.random() * 4) + 5;
+            this.player.maxMp += Math.floor(Math.random() * 4) + 2;
+            this.player.hp = this.player.maxHp;
+            this.player.mp = this.player.maxMp;
+            this.player.nextExp = Math.floor(this.player.nextExp * 1.5);
+
+            this.logs.push(`レベルアップ！ レベル${this.player.level}になった！ HP/MP全回復！`)
+            this.scrollToBottom();
+
+            this.fanfare.play();
+          }
+        },
+        run() {
+          const chance = Math.random();
+
+          if(chance < 0.5) {
+            this.endBattle(`勇者は逃げ出した！`)
+          } else {
+            this.endBattle(`にげられなかった！`)
+            this.scrollToBottom();
+
+            this.enemies.forEach((enemy) => {
+            if(enemy.hp > 0) {
+              const enemyDmg = Math.floor(Math.random() * 4) + 2;
+              this.player.hp -= enemyDmg;
+              this.logs.push(`${enemy.name} のこうげき！ ${enemyDmg} のダメージ！`)
+              this.scrollToBottom();
+            }
+          });
+
+          if (this.player.hp <= 0) {
+            this.player.hp = 0;
+            this.endBattle(`敗北．．．勇者は倒れてしまった！`);
+          };
+            
+          this.scrollToBottom();
+          }
+        },
+        endBattle(message) {
+          this.resultMessage = message;
+          this.isBattleOver = true;
+
+          if(message === "すべての敵をたおした！") {
+            setTimeout(() => {
+              this.startNextBattle();
+            }, 2000);
+          }
+        },
+        startNextBattle() {
+          this.enemies = this.getRandomEnemySet();
+          this.isBattleOver = false;
+          this. resultMessage = "";
+          this.logs.push(`つぎのてきがあらわれた！`)
+          this.scrollToBottom();
+        },
+        scrollToBottom() {
+          this.$nextTick(() => {
+            const box = this.$refs.logBox;
+            if(box) {
+              box.scrollTop  = box.scrollHeight;
+            }
+          });
+        }
+      }
+    });
+
+  </script>
+</body>
+</html>
