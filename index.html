@@ -297,7 +297,7 @@
           if(chance < 0.5) {
             this.endBattle(`勇者は逃げ出した！`)
           } else {
-            this.endBattle(`にげられなかった！`)
+            this.logs.push(`にげられなかった！`)
             this.scrollToBottom();
 
             this.enemies.forEach((enemy) => {
